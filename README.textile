@@ -1,0 +1,57 @@
+h1. About
+
+This is an experiment how messaging can be used to scale social apps
+
+architecture: sync frontend, async tasks go to backend
+
+h1. Design
+
+Each user has a fanout exchange for his followers and a queue for notifications. All the followers have their notification queue bind to the user's exchange. So there is one fanout exchange per user, one queue per user, but there are many bindings between them.
+
+<pre>
+botanicus_followers (fanout exchange):
+  -> merboutpost_notifications (queue)
+  -> _solnic__notifications (queue)
+  -> __snusnu___notifications (queue)
+
+_solnic_followers (fanout exchange):
+  -> merboutpost_notifications (queue)
+  -> botanicus_notifications (queue)
+  -> __snusnu___notifications (queue)
+</pre>
+
+h1. Usage
+
+<pre>
+gem install dm-notifications
+</pre>
+
+<pre>
+require "dm-notifications"
+</pre>
+
+h1. Backend
+
+Redefine this method in order to customize what is published, so for example you might want to push just raw SQL statements and run them directly on the worker(s), so you won't need to create bunch of objects just to call #save on them.
+
+<pre>
+class User
+  def encode_notification(notification)
+    notification.attributes.to_json
+  end
+end
+</pre>
+
+Since validations and all this kind of stuff was done on the frontend, you don't really need to instantiate the User class just for saving the record. So instead we can simply send to workers only SQL insert statements. It's actually really easy:
+
+<pre>
+class User
+  def encode_notification(notification)
+    # TODO: how to get SQL from DM?
+  end
+end
+</pre>
+
+h1. Problems
+
+Even though this kind of stuff is / should be the purpose of AMQP, the current implementations (at least RabbitMQ) don't have cheap queues and exchanges, so in case of bigger apps, you might run into problems. It's at least what I've been told by the RabbitMQ guys, but I didn't actually run any test
